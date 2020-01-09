@@ -1,9 +1,12 @@
 import imp
-
+import time
 from kivy.uix.floatlayout import FloatLayout
-from kivy.properties import BooleanProperty, ObjectProperty, ListProperty
+from kivy.properties import BooleanProperty, ObjectProperty, ListProperty, StringProperty
 from kivy.lang import Builder
 from kivy.logger import Logger
+from kivy.uix.relativelayout import RelativeLayout
+from kivy.core.window import Window
+from kivy.clock import Clock
 
 from core.failedscreen import FailedScreen
 from core.getplugins import getPlugins
@@ -11,6 +14,50 @@ from core.getplugins import getPlugins
 class BlackHole(object):
     def __init__(self, **kw):
         super(BlackHole, self).__init__()
+
+
+class ClockViewer(RelativeLayout):
+    """
+            This class handles the time information that is shown
+            to the user
+        """
+    ctimer_text = StringProperty()
+
+    def __init__(self, **kwargs):
+        super(ClockViewer, self).__init__(**kwargs)
+        # Allow it to get always into the front on being touched
+        self.clock_format = "12h"
+        self.icon_size = [size_val * 100 / 100 for size_val in Window.size]
+        self.ctimer_text = self._get_current_date()
+        self.clock_refresh_rate = 1  # seconds
+
+        self.clk = Clock.schedule_interval(self.update_time, int(self.clock_refresh_rate))
+
+    def on_touch_up(self, touch):
+        pass
+
+    def _get_current_date(self):
+        """
+            Return the current data with the desired configuration
+        """
+        if '24h' in self.clock_format:
+            # date_str = '[color=FFFFFF][b][size={}]%H:%M:%S[/size]\n[size={}]%a, %d %B[/size][/color][/b]'.format(
+            #     int(self.icon_size[0]), int(self.icon_size[1]))
+            date_str = '[color=FFFFFF][b][size={}]%H:%M[/size]\n[size={}]%a, %d %B[/size][/color][/b]'.format(
+                int(self.icon_size[0]), int(self.icon_size[1]))
+        else:
+            # date_str = '[color=FFFFFF][b][size={}]%I:%M:%S[/size][size={}] %p[/size]\n[size=25]%a, %d %B[/size][/b][/color]'.format(
+            #     int(self.icon_size[0]), int(self.icon_size[1]))
+            date_str = '[color=FFFFFF][b][size={}]%I:%M[/size][size={}] %p[/size]\n[size=25]%a, %d %B[/size][/b][/color]'.format(
+                int(self.icon_size[0]), int(self.icon_size[1]))
+        return time.strftime(date_str)
+
+    def update_time(self, dt):
+        """
+            This function does the update of the time on screen
+        """
+        self.ctimer_text = self._get_current_date()
+
 
 class InfoScreen(FloatLayout, BlackHole):
     # Flag for determining whether screen is locked or not
@@ -25,7 +72,7 @@ class InfoScreen(FloatLayout, BlackHole):
         super(InfoScreen, self).__init__(**kwargs)
 
         # Get our list of available plugins
-        #plugins = kwargs["plugins"]
+        # plugins = kwargs["plugins"]
 
         # We need a list to hold the names of the enabled screens
         self.availablescreens = []
@@ -122,7 +169,7 @@ class InfoScreen(FloatLayout, BlackHole):
         foundscreen = [p for p in getPlugins() if p["name"] == screenname]
 
         # Check we've found a screen and it's not already running
-        if foundscreen and not screenname in self.availablescreens:
+        if foundscreen and screenname not in self.availablescreens:
 
             # Get the details for the screen
             p = foundscreen[0]
@@ -183,7 +230,6 @@ class InfoScreen(FloatLayout, BlackHole):
         except IndexError:
             pass
 
-
     def next_screen(self, rev=False):
         if not self.locked:
             if rev:
@@ -195,7 +241,6 @@ class InfoScreen(FloatLayout, BlackHole):
 
             self.index = (self.index + inc) % len(self.availablescreens)
             self.scrmgr.current = self.availablescreens[self.index]
-
 
     def switch_to(self, screen):
 

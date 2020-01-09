@@ -1,11 +1,43 @@
 #:kivy 1.0.9
 <InfoScreen>
+    canvas.before:
+        Color:
+            rgb: 0,0,0
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
     scrmgr: iscreenmgr
     id: iscreen
+
 
     ScreenManager:
         id: iscreenmgr
         auto_bring_to_front: False
+
+
+
+    FloatLayout:
+        orientation: 'horizontal'
+
+        ClockViewer:
+            id:clock_viewer
+            auto_bring_to_front: True
+            size_hint:(None, None)
+            #size:(ctimer_label.width, ctimer_label.height)
+            size: (300,300)
+            #pos:(root.width - self.width - 10, ctimer_label.height/2)
+            pos: (100,100)
+            #pos:(root.width - self.width - 10, 300)
+            Label:
+                id: ctimer_label
+                markup:True
+                #font_name:'../docs/fonts/roboto/Roboto-Black.ttf'
+                size: self.texture_size
+                pos:(0, 0)
+                text:clock_viewer.ctimer_text
+
+
 
     HiddenButton:
         id: btn_left
@@ -19,6 +51,7 @@
         size_hint: None, None
         pos: 0, 0
         on_press: root.next_screen(True)
+
 
 <BGLabel>
     padding: 2, 2

@@ -3,11 +3,20 @@
 <PhotoAlbumScreen>:
     photoscreen: photoscreen
 
+    GestureBox:
+        on_left_to_right_line:
+            auto_bring_to_front: False
+            root.swipe_photo("back")
+        on_right_to_left_line:
+            auto_bring_to_front: False
+            root.swipe_photo("forward")
+
     ScreenManager:
         id: photoscreen
         transition: FadeTransition(duration=1)
 
 <Photo>
+
     AsyncImage:
         allow_stretch: True
         maximize: True

@@ -4,6 +4,7 @@ import sys
 import json
 
 from kivy.app import App
+from kivymd.app import MDApp
 from kivy.core.window import Window
 from kivy.graphics import Rectangle, Color
 from kivy.lang import Builder
@@ -28,14 +29,19 @@ os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 VERSION = "0.4.1"
 
 
-class InfoScreenApp(App):
+class InfoScreenApp(MDApp):
     base = None
+
+    def __init__(self, **kwargs):
+        self.title = "My Material Application"
+        super().__init__(**kwargs)
+        self._config = config
 
     def build(self):
         # Window size is hardcoded for resolution of official Raspberry Pi
         # display. Can be altered but plugins may not display correctly.
         Window.size = (800, 480)
-        self.base = InfoScreen(plugins=plugins, overlays=overlays)
+        self.base = InfoScreen(plugins=plugins, overlays=overlays, config=config)
         return self.base
 
 
@@ -48,19 +54,11 @@ if __name__ == "__main__":
     plugins = getPlugins()
     overlays = get_overlays()
 
-    # TODO Remove after a few trials
-    # Get the base KV language file for the Info Screen app.
-    # kv_text = "".join(open("base.kv").readlines()) + "\n"
-
     # Load the master KV file
-    # Builder.load_string(kv_text)  # TODO Remove after a few trials
     Builder.load_file("base.kv")
 
     # Loop over the plugins and add to Builder
     for p in plugins:
-        # TODO Remove after a few trials
-        # and add their custom KV files to create one master KV file
-        # kv_text += "".join(p["kv"])
         Builder.load_file(p["kvpath"])
 
     # Loop over the overlays and add to Builder

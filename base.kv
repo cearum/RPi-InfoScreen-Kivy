@@ -7,16 +7,15 @@
             pos: self.pos
             size: self.size
 
+    size: root.size
+
     scrmgr: iscreenmgr
     overlay_mgr: i_overlay_mgr
     id: iscreen
 
-
     ScreenManager:
         id: iscreenmgr
         auto_bring_to_front: False
-
-
 
     FloatLayout:
         id: i_overlay_mgr
@@ -38,10 +37,25 @@
         on_press: root.next_screen(True)
 
     HiddenButton:
-        size: root.width, 50
+        size: 50, 50
         size_hint: None, None
         pos: 0, 0
         on_press: root.toggle_overlay()
+        Image:
+            color: (1, 1, 1, 0.1)
+            size: 50, 50
+            source: 'images/view-dashboard-variant-white.png'
+
+    HiddenButton:
+        size: 50, 50
+        size_hint: None, None
+        pos: root.width - 50, 0
+        on_press: root.toggle_settings()
+        Image:
+            color: (1, 1, 1, 0.1)
+            size: 50, 50
+            pos: root.width - 50, 0
+            source: 'images/settings.png'
 
 
 <BGLabel>
@@ -66,3 +80,33 @@
         Rectangle:
             size: self.size
             pos: self.pos
+
+
+<ContentForPopupScreen@BoxLayout>
+    id: box
+    #spacing: dp(20)
+    size_hint_y: dp(20)
+    #height: 20
+    pos_hint: {"top": 1}
+
+    Widget
+
+    MDFillRoundFlatIconButton:
+        text: "Brightness-5"
+        icon: "brightness-5"
+        width: dp(50)
+        md_bg_color: 1, 0, 0, 0
+        #pos_hint: {"center_x": .5}
+        on_press: app.base.callback_for_setting_items(self.text)
+
+    Widget
+
+    MDFillRoundFlatIconButton:
+        text: "Brightness-6"
+        icon: "brightness-6"
+        width: dp(50)
+        md_bg_color: 1, 0, 0, 0
+        #pos_hint: {"center_x": .5}
+        on_press: app.base.callback_for_setting_items(self.text)
+
+    Widget

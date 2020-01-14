@@ -4,9 +4,18 @@ from kivy.uix.floatlayout import FloatLayout
 from kivy.properties import BooleanProperty, ObjectProperty, ListProperty, StringProperty
 from kivy.lang import Builder
 from kivy.logger import Logger
+from kivy.factory import Factory
+from kivy.metrics import dp
 from kivy.uix.relativelayout import RelativeLayout
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.behaviors import ButtonBehavior
+from kivy.uix.image import Image
 from kivy.core.window import Window
 from kivy.clock import Clock
+
+from kivymd.toast.kivytoast.kivytoast import toast
+from kivymd.uix.bottomsheet import MDGridBottomSheet, MDCustomBottomSheet, MDBottomSheet
+from kivymd.uix.snackbar import Snackbar
 
 from core.failedscreen import FailedScreen
 from core.getplugins import getPlugins
@@ -18,6 +27,8 @@ class BlackHole(object):
         super(BlackHole, self).__init__()
 
 
+# This way we put the debug info to console instead of catching errors
+# it allows developers to view more debug info in the console.
 DEBUG = True
 
 
@@ -30,9 +41,10 @@ class InfoScreen(FloatLayout, BlackHole):
 
     # List of plugins
 
-    def __init__(self, plugins=None, overlays=None, **kwargs):
+    def __init__(self, plugins=None, overlays=None, config=None, **kwargs):
         self._plugins = plugins
         overlays = overlays
+        self._config = config
         super(InfoScreen, self).__init__(**kwargs)
 
         # We need a list to hold the names of the enabled screens and overlays
@@ -49,6 +61,10 @@ class InfoScreen(FloatLayout, BlackHole):
         # Empty lists to track various failures
         dep_fail = []
         failed_screens = []
+
+        # TODO - Implement enable/disable settings from settings_enabled boolean
+        settings_config = self._config.get("settings", dict())
+        settings_enabled = settings_config.get("enabled", False)
 
         # Loop over overlays
         for w in overlays:
@@ -334,3 +350,103 @@ class InfoScreen(FloatLayout, BlackHole):
             self.overlay_mgr.opacity = 1
         else:
             pass
+
+# TODO Move Settings Screen Popup to it's own file
+
+    def callback_for_setting_items(self, *args):
+        toast(args[0])
+
+    def toggle_settings(self):
+
+        bs_menu = MyMDGridBottomSheet()
+        bs_menu.add_item(
+            "Blank",
+            lambda x: self.callback_for_setting_items("Blank"),
+            icon_src="images/10x10_transparent.png",
+        )
+        bs_menu.add_item(
+            "Blank",
+            lambda x: self.callback_for_setting_items("Blank"),
+            icon_src="images/10x10_transparent.png",
+        )
+        bs_menu.add_item(
+            "Facebook",
+            lambda x: self.callback_for_setting_items("Brightness"),
+            icon_src="images/brightness-5-black.png",
+        )
+        bs_menu.add_item(
+            "Blank",
+            lambda x: self.callback_for_setting_items("Blank"),
+            icon_src="images/10x10_transparent.png",
+        )
+        bs_menu.add_item(
+            "Blank",
+            lambda x: self.callback_for_setting_items("Blank"),
+            icon_src="images/10x10_transparent.png",
+        )
+
+        bs_menu.open()
+
+
+
+Builder.load_string(
+    """
+<MyBottomIcon>
+    
+    
+<MyGridBottomSheetItem>
+    orientation: "vertical"
+    padding: 0, 0, 0, 0
+    size_hint_y: 50
+    size_hint_x: 50
+    width: 50
+    height: 50
+    #size: dp(64), dp(96)
+    
+    MyBottomIcon:
+        id: icon
+        size_hint_y: 48
+        on_release: root.release_btn()
+        source: root.source
+
+    
+"""
+)
+
+
+class MyBottomIcon(ButtonBehavior, Image):
+    pass
+
+
+class MyGridBottomSheetItem(BoxLayout):
+    source = StringProperty()
+
+    def __init__(self, **kwargs):
+        self.register_event_type('on_release')
+        super().__init__(**kwargs)
+
+        #Clock.schedule_once(self.bind_on_release)
+
+    def release_btn(self):
+        self.dispatch('on_release')
+
+    def on_release(self):
+        pass
+
+    def bind_on_release(self, dt):
+        pass
+        #print(self.ids.icon)
+        #self.ids.icon.bind(on_release=lambda x: self.on_release)
+
+class MyMDGridBottomSheet(MDBottomSheet):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._gl_content.padding = (dp(30), 0, dp(30), 0)  # (dp(0), 0, dp(0), dp(0))
+        self._gl_content.height = 50  # dp(50)
+        self._gl_content.cols = 6
+
+    def add_item(self, text, callback, icon_src):
+        MyGridBottomSheetItem()
+
+        item = MyGridBottomSheetItem(on_release=callback, source=icon_src)
+        self._gl_content.add_widget(item)

@@ -22,6 +22,15 @@ class BlackHole(object):
         super(BlackHole, self).__init__()
 
 
+class WeatherError(Screen):
+    """Screen to show errors."""
+    location_label = StringProperty("")
+
+    def __init__(self, label_text, **kwargs):
+        super(WeatherError, self).__init__(**kwargs)
+        self.ids.error_label.text = label_text
+
+
 class WeatherForecastHourly(BoxLayout):
     """Custom widget to show hourly forecast summary."""
     weather = StringProperty("")
@@ -105,7 +114,7 @@ class WeatherSummary(Screen):
     def getData(self, *args):
         # Get the forecast
         self._forecast = self._darksky.get_forecast(
-            self._location[0], self._location[1],
+            float(self._location[0]), float(self._location[1]),
             extend=False,  # default `False`
             lang=languages.ENGLISH,  # default `ENGLISH`
             units=units.AUTO,  # default `auto`
@@ -174,23 +183,29 @@ class DarkSkyWeatherScreen(Screen, BlackHole):
         self.screen_id = 0
         self.my_screens = [x["name"] for x in self.locations]
 
+        self.default_api_key_text = "<api-key-goes-here>"
+
     def on_enter(self):
         # If the screen hasn't been displayed before then let's load up
         # the locations
         if not self.running:
-            for location in self.locations:
+            if self._key == "<api-key-goes-here>":
+                es = WeatherError(label_text="DarkSky Weather: Please Update API Key")
+                self.screen_manager.add_widget(es)
+            else:
+                for location in self.locations:
 
-                # Create a weather summary screen
-                ws = WeatherSummary(api_key=self._key,
-                                    location=(location["latitude"], location["longitude"]),
-                                    name=location['name']  # Kivy Widget Name
-                                    )
+                    # Create a weather summary screen
+                    ws = WeatherSummary(api_key=self._key,
+                                        location=(location["latitude"], location["longitude"]),
+                                        name=location['name']  # Kivy Widget Name
+                                        )
 
-                # and add to our screen manager.
-                self.screen_manager.add_widget(ws)
+                    # and add to our screen manager.
+                    self.screen_manager.add_widget(ws)
 
-            # set the flag so we don't do this again.
-            self.running = True
+                # set the flag so we don't do this again.
+                self.running = True
 
         else:
             # Fixes bug where nested screens don't have "on_enter" or

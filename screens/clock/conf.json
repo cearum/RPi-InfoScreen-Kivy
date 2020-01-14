@@ -1,5 +1,6 @@
 {
     "screen": "ClockScreen",
     "kv": "clock.kv",
-    "enabled": false
+    "enabled": true,
+    "show_overlay": false
 }

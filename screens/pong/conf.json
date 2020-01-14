@@ -3,7 +3,7 @@
     "kv": "pong.kv",
     "dependencies": [],
     "enabled": false,
-    "params":
-        {"winningscore": 5}
-
+    "params": {
+        "winningscore": 5
+    }
 }

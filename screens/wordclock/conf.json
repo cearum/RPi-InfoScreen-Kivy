@@ -2,9 +2,13 @@
     "screen": "WordClockScreen",
     "kv": "wordclock.kv",
     "dependencies": [],
-    "enabled": true,
+    "enabled": false,
     "params": {
         "language": "english",
-        "colour": [0, 200, 200]
+        "colour": [
+            0,
+            200,
+            200
+        ]
     }
 }

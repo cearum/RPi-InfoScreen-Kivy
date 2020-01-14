@@ -1,0 +1,16 @@
+
+
+<ClockOverlay>:
+    id:clock_viewer
+    auto_bring_to_front: True
+    size_hint:(None, None)
+    size:(ctimer_label.width, ctimer_label.height)
+    pos:(800 - self.width - 10, ctimer_label.height/2)
+
+    Label:
+        id: ctimer_label
+        markup:True
+        #font_name:'./fonts/roboto/Roboto-Black.ttf'
+        size: self.texture_size
+        pos: (0, 0)
+        text: clock_viewer.clock_overlay_text

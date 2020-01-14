@@ -55,6 +55,7 @@ def getPlugins(inactive=False):
                           "kvpath": kvpath,
                           "params": conf.get("params", None),
                           "enabled": conf.get("enabled", False),
+                          "show_overlay": conf.get("show_overlay", True),
                           "web": web}
 
                 plugins.append(plugin)

@@ -9,17 +9,17 @@
 
    API format:
 
-   [HOST]/api/<screenname>/configure
+   [HOST]/api/<screen_name>/configure
         GET: returns JSON format of user-configurable settings for screen
         POST: takes JSON format of updated configuration.
 
-   [HOST]/api/<screenname>/enable
+   [HOST]/api/<screen_name>/enable
         GET: enable the selected screen
 
-   [HOST]/api/<screenname>/disable
+   [HOST]/api/<screen_name>/disable
         GET: disable the selected screen
 
-   [HOST]/api/<screenname>/view
+   [HOST]/api/<screen_name>/view
         GET: change to screen
 
 
@@ -64,18 +64,22 @@ class InfoScreenAPI(Bottle):
         self.error_handler[404] = self.unknown
 
         # API METHODS
-        self.route("/api/<screen>/configure",
+        self.route("/api/screens/configure/<screen>",
                    callback=self.get_config,
                    method="GET")
-        self.route("/api/<screen>/configure",
+        self.route("/api/screens/configure/<screen>",
                    callback=self.set_config,
                    method="POST")
-        self.route("/api/<screen>/enable",
+        self.route("/api/screens/enable/<screen>",
                    callback=self.enable_screen)
-        self.route("/api/<screen>/disable",
+        self.route("/api/screens/disable/<screen>",
                    callback=self.disable_screen)
-        self.route("/api/<screen>/view",
+        self.route("/api/screens/view/<screen>",
                    callback=self.view)
+
+        self.route("/api/overlays/configure/<overlay>",
+                   callback=self.set_overlay_config,
+                   method="POST")
 
     def api_success(self, data):
         """Base method for response to successful API calls."""
@@ -146,6 +150,38 @@ class InfoScreenAPI(Bottle):
             # Something's gone wrong
             return self.api_error("Invalid data received.")
 
+    def set_overlay_config(self, overlay):
+
+        try:
+            # Get JSON data
+            js = request.json
+
+            if js is None:
+                # No data, so provide error
+                return self.api_error("No JSON data received. "
+                                      "Check headers are set correctly.")
+
+            else:
+                # Try to save the new config
+                success = self.save_config(overlay, js, "overlays")
+
+                # If successfully saved...
+                if success:
+
+                    # Reload the screen with the new config
+                    self.infoscreen.reload_screen(overlay)
+
+                    # Provide success notification
+                    return self.api_success(json.dumps(js))
+
+                else:
+                    # We couldn't save new config
+                    return self.api_error("Unable to save configuration.")
+
+        except:
+            # Something's gone wrong
+            return self.api_error("Invalid data received.")
+
     def default(self):
         # Generic response for unknown requests
         result = self.api_error("Invalid method.")
@@ -161,19 +197,30 @@ class InfoScreenAPI(Bottle):
         except:
             return self.api_error("Could not change screen.")
 
-
     # Helper Methods ###########################################################
 
-    def save_config(self, screen, params):
-        try:
-            conffile = os.path.join(self.folder, "screens", screen, "conf.json")
-            conf = json.load(open(conffile, "r"))
-            conf["params"] = params
-            with open(conffile, "w") as config:
-                json.dump(conf, config, indent=4)
-            return True
-        except:
-            return False
+    def save_config(self, widget, params, folder=None):
+        if folder is None:
+            try:
+                conf_file = os.path.join(self.folder, "screens", widget, "conf.json")
+                conf = json.load(open(conf_file, "r"))
+                conf["params"] = params
+                with open(conf_file, "w") as config:
+                    json.dump(conf, config, indent=4)
+                return True
+            except:
+                return False
+        elif folder is "overlays":
+            try:
+                conf_file = os.path.join(self.folder, "overlays", widget, "conf.json")
+                conf = json.load(open(conf_file, "r"))
+                conf["params"] = params
+                with open(conf_file, "w") as config:
+                    json.dump(conf, config, indent=4)
+                self.infoscreen.reload_overlay(widget)
+                return True
+            except:
+                return False
 
     def enable_screen(self, screen):
         try:

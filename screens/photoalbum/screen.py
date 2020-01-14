@@ -7,6 +7,9 @@ from kivy.properties import (ObjectProperty,
                              BoundedNumericProperty)
 from kivy.uix.label import Label
 from kivy.uix.screenmanager import Screen
+from random import shuffle
+from imghdr import what
+
 
 class BlackHole(object):
     def __init__(self, **kw):
@@ -42,8 +45,9 @@ class PhotoAlbumScreen(Screen, BlackHole):
 
         # Get the user's preferences
         self.folders = params["folders"]
-        self.exts = params["extensions"]
+        # self.exts = params["extensions"]
         self.photoduration = params["duration"]
+        self.allow_shuffle = params.get("random", True)
 
         # Initialise some useful variables
         self.running = False
@@ -79,24 +83,32 @@ class PhotoAlbumScreen(Screen, BlackHole):
         """Method to retrieve list of photos based on user's preferences."""
 
         # Get a list of extensions. Assumes all caps or all lower case.
-        exts = []
-        for ext in ([x.upper(), x.lower()] for x in self.exts):
-            exts.extend(ext)
+        # exts = []
+        # for ext in ([x.upper(), x.lower()] for x in self.exts):
+        #     exts.extend(ext)
 
         # Loop over the folders
         for folder in self.folders:
+            for (path, dirs, files) in os.walk(folder):
+                for the_file in files:
+                    path_file = os.path.join(path, the_file)
 
-            # Look for each extension
-            for ext in exts:
+                    # uses what from IMGHDR to check for image file types
+                    file_type = what(path_file)
 
-                # Get the photos
-                photos = glob(os.path.join(folder, "*.{}".format(ext)))
+                    # If the image type matches an image we go one further
+                    if file_type is not None:
 
-                # Add to our master list
-                self.photos.extend(photos)
+                        # We don't want Gif's though as they don't work well
+                        if file_type is not 'gif':
 
-        # Put the photos in order
-        self.photos.sort()
+                            self.photos.append(path_file)
+
+        # shuffle if requested
+        if self.allow_shuffle:
+            shuffle(self.photos)
+        else:  # Put the photos in order
+            self.photos.sort()
 
         # We've got the photos so we can set the running flag
         self.running = True
@@ -114,10 +126,10 @@ class PhotoAlbumScreen(Screen, BlackHole):
         # Get the current photo
         photo = self.photos[self.photoindex]
 
-        # Create a screen pbject to show that photo
+        # Create a screen object to show that photo
         scr = Photo(name=photo)
 
-        # Add it to our screenmanager and display it
+        # Add it to our screen manager and display it
         self.photoscreen.add_widget(scr)
         self.photoscreen.current = photo
 
@@ -132,3 +144,8 @@ class PhotoAlbumScreen(Screen, BlackHole):
 
         # Increase our index for the next photo
         self.photoindex = (self.photoindex + 1) % len(self.photos)
+
+        # If we hit the end of the photos reshuffle
+        if self.photoindex == len(self.photos):
+            if self.allow_shuffle:
+                shuffle(self.photos)

@@ -1,0 +1,6 @@
+{
+    "overlay": "DummyOverlay",
+    "kv": "dummy.kv",
+    "dependencies": [],
+    "enabled": false
+}

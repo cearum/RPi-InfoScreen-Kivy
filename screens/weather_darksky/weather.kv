@@ -1,0 +1,106 @@
+<DarkSkyWeatherScreen>
+    FloatLayout:
+        id: weather_float
+
+        BoxLayout:
+            id: weather_base_box
+            Label:
+                id: weather_lbl_load
+                text: "Loading weather..."
+
+        ScreenManager:
+            id: weather_screen_manager
+            auto_bring_to_front: False
+
+        HiddenButton:
+            size: root.width, 50
+            size_hint: None, None
+            pos: 0, root.height - 50
+            on_press: root.next_screen()
+
+        HiddenButton:
+            size: root.width, 50
+            size_hint: None, None
+            pos: 0, 0
+            on_press: root.next_screen(False)
+
+<WeatherSummary>
+    BoxLayout:
+        padding: 5, 5
+        orientation: "vertical"
+        Label:
+            text: root.location_label
+            font_size: 40
+            size_hint_y: 0.2
+
+        BoxLayout:
+            padding: 2
+            id: bx_forecast
+            orientation: "horizontal"
+            size_hint_y: 0.3
+            spacing: 5
+
+        BoxLayout:
+            padding: 2
+            id: bx_hourly
+            orientation: "horizontal"
+            size_hint_y: 0.4
+            spacing: 5
+
+<WeatherForecastDay>
+    orientation: "vertical"
+    canvas.before:
+        Color:
+            rgba: 0.2, 0.2, 0.2, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    BoxLayout:
+        size_hint_y: 0.8
+        orientation: "horizontal"
+        Label:
+            text: root.day
+            markup: True
+            font_size: 18
+
+        AnchorLayout:
+            anchor_x:'right'
+            anchor_y:'top'
+            AsyncImage:
+                source: root.icon_url
+
+    Label:
+        size_hint_y: 0.3
+        text: root.weather
+        text_size: root.width, None
+        valign: 'top'
+        halign: 'center'
+
+<WeatherForecastHourly>
+    width: 100
+    size_hint_x: None
+    orientation: "vertical"
+    canvas.before:
+        Color:
+            rgba: 0.25, 0.25, 0.25, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    Label:
+        size_hint_y: 0.15
+        text: root.time_label
+    AsyncImage:
+        size_hint_y: 0.45
+        source: root.icon_url
+    Label:
+        size_hint_y: 0.2
+        halign: 'center'
+        markup: True
+        text: root.weather
+    Label:
+        size_hint_y: 0.15
+        text: root.summary
+        text_size: root.width, None
+        halign: 'center'
+        valign: 'top'
+        markup: True

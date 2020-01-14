@@ -8,6 +8,7 @@
             size: self.size
 
     scrmgr: iscreenmgr
+    overlay_mgr: i_overlay_mgr
     id: iscreen
 
 
@@ -18,25 +19,9 @@
 
 
     FloatLayout:
+        id: i_overlay_mgr
         orientation: 'horizontal'
-
-        ClockViewer:
-            id:clock_viewer
-            auto_bring_to_front: True
-            size_hint:(None, None)
-            #size:(ctimer_label.width, ctimer_label.height)
-            size: (300,300)
-            #pos:(root.width - self.width - 10, ctimer_label.height/2)
-            pos: (100,100)
-            #pos:(root.width - self.width - 10, 300)
-            Label:
-                id: ctimer_label
-                markup:True
-                #font_name:'../docs/fonts/roboto/Roboto-Black.ttf'
-                size: self.texture_size
-                pos:(0, 0)
-                text:clock_viewer.ctimer_text
-
+        opacity: 1
 
 
     HiddenButton:
@@ -51,6 +36,12 @@
         size_hint: None, None
         pos: 0, 0
         on_press: root.next_screen(True)
+
+    HiddenButton:
+        size: root.width, 50
+        size_hint: None, None
+        pos: 0, 0
+        on_press: root.toggle_overlay()
 
 
 <BGLabel>

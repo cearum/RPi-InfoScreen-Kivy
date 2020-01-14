@@ -1,0 +1,10 @@
+{
+    "overlay": "ClockOverlay",
+    "kv": "clock_overlay.kv",
+    "dependencies": [],
+    "enabled": true,
+    "params": {
+        "icon_size_percent": 5,
+        "clock_format": "12h"
+    }
+}

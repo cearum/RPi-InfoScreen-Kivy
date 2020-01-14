@@ -18,6 +18,7 @@ from kivy.uix.scrollview import ScrollView
 
 from core.bglabel import BGLabel, BGLabelButton
 from core.getplugins import getPlugins
+from core.getoverlays import get_overlays
 from core.hiddenbutton import HiddenButton
 from core.infoscreen import InfoScreen
 
@@ -29,34 +30,42 @@ VERSION = "0.4.1"
 
 class InfoScreenApp(App):
     base = None
+
     def build(self):
         # Window size is hardcoded for resolution of official Raspberry Pi
         # display. Can be altered but plugins may not display correctly.
         Window.size = (800, 480)
-        self.base = InfoScreen(plugins=plugins)
+        self.base = InfoScreen(plugins=plugins, overlays=overlays)
         return self.base
+
 
 if __name__ == "__main__":
     # Load our config
     with open("config.json", "r") as cfg_file:
         config = json.load(cfg_file)
 
-    # Get a list of installed plugins
+    # Get a list of installed plugins and overlays
     plugins = getPlugins()
+    overlays = get_overlays()
 
+    # TODO Remove after a few trials
     # Get the base KV language file for the Info Screen app.
-    kv_text = "".join(open("base.kv").readlines()) + "\n"
+    # kv_text = "".join(open("base.kv").readlines()) + "\n"
 
     # Load the master KV file
-    # Builder.load_string(kv_text)
+    # Builder.load_string(kv_text)  # TODO Remove after a few trials
     Builder.load_file("base.kv")
 
-    # Loop over the plugins
+    # Loop over the plugins and add to Builder
     for p in plugins:
-
+        # TODO Remove after a few trials
         # and add their custom KV files to create one master KV file
         # kv_text += "".join(p["kv"])
         Builder.load_file(p["kvpath"])
+
+    # Loop over the overlays and add to Builder
+    for w in overlays:
+        Builder.load_file(w['kvpath'])
 
     # Do we want a webserver?
     web = config.get("webserver", dict())
@@ -76,8 +85,8 @@ if __name__ == "__main__":
     if web.get("enabled") and web_enabled:
 
         # Start our webserver
-        webport = web.get("webport", 8088)
-        apiport = web.get("apiport", 8089)
+        webport = web.get("webport", web.get("webport"))
+        apiport = web.get("apiport", web.get("apiport"))
         debug = web.get("debug", False)
         start_web_server(os.path.dirname(os.path.abspath(__file__)),
                          webport,

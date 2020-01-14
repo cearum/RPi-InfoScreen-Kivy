@@ -25,12 +25,20 @@ from bottle import Bottle, template, request, TEMPLATE_PATH, redirect
 import requests
 
 from core.getplugins import getPlugins
+from core.getoverlays import get_overlays
 from core.webapi import InfoScreenAPI
 
 HEADER = '''Raspberry Pi Information Screen<br />'''
 
 SCREEN_CONFIG = '''% rebase("base.tpl", title="Configuration Screen: {}".format(screen.capitalize()))
-    <form action="/configure/{{screen}}" method="POST">
+    <form action="/configure/screen/{{screen}}" method="POST">
+    <br />
+    <textarea cols="60" rows="10" name="params" maxlength="2500">{{conf}}</textarea><br />
+    <br />
+    <button type="submit">Save Config</button></form>'''
+
+OVERLAY_CONFIG = '''% rebase("base.tpl", title="Configuration Screen: {}".format(overlay.capitalize()))
+    <form action="/configure/overlay/{{overlay}}" method="POST">
     <br />
     <textarea cols="60" rows="10" name="params" maxlength="2500">{{conf}}</textarea><br />
     <br />
@@ -62,11 +70,16 @@ class InfoScreenWebServer(Bottle):
         self.custom_screens = {}
 
         # Build the dictionary of available screens
+        self.screens = None
         self.process_plugins()
+        self.overlays = None
+        self.process_overlays()
 
         # Define our routes
-        self.route("/configure/<screen>", callback=self.update_config, method="GET")
-        self.route("/configure/<screen>", callback=self.save_config, method="POST")
+        self.route("/configure/screen/<screen>", callback=self.update_screen_config, method="GET")
+        self.route("/configure/screen/<screen>", callback=self.save_screen_config, method="POST")
+        self.route("/configure/overlay/<overlay>", callback=self.update_overlay_config, method="GET")
+        self.route("/configure/overlay/<overlay>", callback=self.save_overlay_config, method="POST")
         self.route("/view/<screen>", callback=self.view)
         self.route("/", callback=self.list_screens, method=["GET", "POST"])
 
@@ -79,6 +92,10 @@ class InfoScreenWebServer(Bottle):
         self.screens = {s["name"]: {"web": s["web"], "enabled": s["enabled"]}
                          for s in getPlugins(True)}
 
+    def process_overlays(self):
+        self.overlays = {s["name"]: {"web": s["web"], "enabled": s["enabled"]}
+                         for s in get_overlays(True)}
+
     def add_custom_routes(self):
 
         # Get the custom screen dictionary
@@ -86,6 +103,10 @@ class InfoScreenWebServer(Bottle):
 
         # Get a list of just those screens who have custom web pages
         addons = [(x, sc[x]["web"]) for x in sc if sc[x]["web"]]
+
+        # Get the custom overlay dictionary
+        ol = self.overlays
+        overlays = [(x, ol[x]["web"]) for x in ol if ol[x]["web"]]
 
         # Loop over the list
         for screen, addon in addons:
@@ -105,6 +126,23 @@ class InfoScreenWebServer(Bottle):
             # the list of installed screens
             self.custom_screens[screen] = plugin.bindings[0][0]
 
+        for overlay, addon in overlays:
+
+            # Load the module
+            plugin = imp.load_module("web", *addon)
+
+            # Loop over the list of web pages...
+            for route in plugin.bindings:
+
+                # ...and add to the available routes
+                self.route(route[0],
+                           callback=getattr(plugin, route[1]),
+                           method=route[2])
+
+            # We also need to store the default page to make it accessible via
+            # the list of installed screens
+            self.custom_screens[overlay] = plugin.bindings[0][0]
+
     def valid_screen(self, screen):
         """Returns True if screen is installed and enabled."""
         return (screen is not None and
@@ -120,43 +158,63 @@ class InfoScreenWebServer(Bottle):
         if form:
 
             # ...find out what the user wanted to do and to which screen
-            action, screen = form.split("+")
+            try:
+                action, screen, overlay = form.split("+")
+            except ValueError:
+                overlay = None
+                action, screen = form.split("+")
 
-            # Call the relevant action
-            if action == "view":
-                r = requests.get("{}{}/view".format(self.api,
-                                                    screen))
+            if overlay is None:
+                # Call the relevant action
+                if action == "view":
+                    r = requests.get("{}screens/view/{}".format(self.api, screen))
 
-            elif action == "enable":
-                r = requests.get("{}{}/enable".format(self.api,
-                                                      screen))
+                elif action == "enable":
+                    r = requests.get("{}screens/enable/{}".format(self.api, screen))
 
-            elif action == "disable":
-                r = requests.get("{}{}/disable".format(self.api,
-                                                       screen))
+                elif action == "disable":
+                    r = requests.get("{}screens/disable/{}".format(self.api, screen))
 
-            elif action == "configure":
-                redirect("/configure/{}".format(screen))
+                elif action == "configure":
+                    redirect("/configure/screen/{}".format(screen))
 
-            elif action == "custom":
-                url = self.custom_screens.get(screen, "/")
-                redirect(url)
+                elif action == "custom":
+                    url = self.custom_screens.get(screen, "/")
+                    redirect(url)
+            else:
+                # Call the relevant action
+                if action == "view":
+                    r = requests.get("{}overlays/view/{}".format(self.api, screen))
+
+                elif action == "enable":
+                    r = requests.get("{}overlays/enable/{}".format(self.api, screen))
+
+                elif action == "disable":
+                    r = requests.get("{}overlays/disable/{}".format(self.api, screen))
+
+                elif action == "configure":
+                    redirect("/configure/overlay/{}".format(screen))
+
+                elif action == "custom":
+                    url = self.custom_screens.get(screen, "/")
+                    redirect(url)
 
         # Rebuild list of screens
         self.process_plugins()
+        self.process_overlays()
         sc = self.screens
+        ol = self.overlays
 
         # Return the web page
-        return template("all_screens.tpl", screens=sc)
+        return template("all_screens_overlays.tpl", screens=sc, overlays=ol)
 
     def view(self, screen=None):
         """Method to switch screen."""
-        r = requests.get("{}{}/view".format(self.api,
-                                               screen))
+        r = requests.get("{}/screens/view/{}".format(self.api, screen))
 
         return template("all_screens.tpl", screens=self.screens)
 
-    def update_config(self, screen=None):
+    def update_screen_config(self, screen=None):
 
         if screen in self.screens:
 
@@ -174,7 +232,7 @@ class InfoScreenWebServer(Bottle):
             # Build the web page
             return template(SCREEN_CONFIG, screen=screen, conf=conf)
 
-    def save_config(self, screen):
+    def save_screen_config(self, screen):
 
         # Flag to indicate whether params have changed
         change_params = False
@@ -202,11 +260,59 @@ class InfoScreenWebServer(Bottle):
 
             if change_params:
                 # Submit the new params to the API
-                r = requests.post("{}{}/configure".format(self.api,
-                                                          screen), json=params)
+                r = requests.post("{}screens/configure/{}".format(self.api, screen), json=params)
 
             redirect("/")
 
+    def update_overlay_config(self, overlay=None):
+
+        if overlay in self.screens:
+
+            # Build the path to our config file
+            conffile = os.path.join(self.folder, "overlays", overlay, "conf.json")
+
+            # Open the file and load the config
+            with open(conffile, "r") as cfg_file:
+                params = json.load(cfg_file)
+
+            # We only want the user to edit the "params" section so just
+            # retrieve that part
+            conf = json.dumps(params.get("params", dict()), indent=4)
+
+            # Build the web page
+            return template(OVERLAY_CONFIG, overlay=overlay, conf=conf)
+
+    def save_overlay_config(self, overlay):
+
+        # Flag to indicate whether params have changed
+        change_params = False
+
+        # Get the new params from the web form
+        try:
+            params = json.loads(request.forms.get("params"))
+        except ValueError:
+            return "INVALID JSON"
+        else:
+            # Let's check if the params have changed
+
+            # Build the path to our config file
+            conffile = os.path.join(self.folder, "overlays", overlay, "conf.json")
+
+            # Open the file and load the config
+            with open(conffile, "r") as cfg_file:
+                conf = json.load(cfg_file)
+
+            # Check if the form is the same as the old one
+            if conf.get("params", dict()) != params:
+
+                # If not, we need to update
+                change_params = True
+
+            if change_params:
+                # Submit the new params to the API
+                r = requests.post("{}overlays/configure/{}".format(self.api, overlay), json=params)
+
+            redirect("/")
 
 def start_web(appdir, webport, apiport, debug=False):
     """Starts the webserver on "webport"."""

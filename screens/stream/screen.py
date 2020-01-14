@@ -21,7 +21,7 @@ class StreamLoading(Screen):
     pass
 
 
-class RtspStream(Video):
+class RtspStream(Video, BlackHole):
     image_overlay_play = StringProperty('docs/image-loading.gif')
     image_loading = StringProperty('docs/image-loading.gif')
 
@@ -33,9 +33,6 @@ class RtspStream(Video):
         super(RtspStream, self).__init__(**kwargs)
         self._image = None
         self._video = None
-        with self.canvas:
-            Color(0, 0, 0)
-            Rectangle(size=self.size, pos=self.pos)
 
         self.source = stream_uri
         self.volume = 0
@@ -113,8 +110,10 @@ class StreamScreen(Screen, BlackHole):
         # The screen hasn't been run before so let's tell the user
         # that we need to get the photos
         if not self.running:
+            # Adding to screen manager so when I have multiple screens I can easily
+            # go between the screens.
             self.loading = StreamLoading(name="loading")
-            self.loading.add_widget(self.rtsp_stream)
+            self.add_widget(self.rtsp_stream)
             self.videoscreen.add_widget(self.loading)
             self.videoscreen.current = "loading"
             self.running = True

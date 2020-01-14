@@ -1,0 +1,19 @@
+{
+    "screen": "DarkSkyWeatherScreen",
+    "kv": "weather.kv",
+    "enabled": true,
+    "dependencies": ["requests", "arrow", "darksky"],
+    "params": {
+        "key": "<api-key-goes-here>",
+        "locations": [
+            {"name": "Detroit",
+             "latitude": "42.3986",
+             "longitude": "-83.1645"
+            },
+            {"name": "Madison",
+             "latitude": "43.0813",
+             "longitude": "-89.3956"
+            }
+        ]
+    }
+}

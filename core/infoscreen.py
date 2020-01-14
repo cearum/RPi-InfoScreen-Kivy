@@ -10,53 +10,15 @@ from kivy.clock import Clock
 
 from core.failedscreen import FailedScreen
 from core.getplugins import getPlugins
+from core.getoverlays import get_overlays
+
 
 class BlackHole(object):
     def __init__(self, **kw):
         super(BlackHole, self).__init__()
 
 
-class ClockViewer(RelativeLayout):
-    """
-            This class handles the time information that is shown
-            to the user
-        """
-    ctimer_text = StringProperty()
-
-    def __init__(self, **kwargs):
-        super(ClockViewer, self).__init__(**kwargs)
-        # Allow it to get always into the front on being touched
-        self.clock_format = "12h"
-        self.icon_size = [size_val * 100 / 100 for size_val in Window.size]
-        self.ctimer_text = self._get_current_date()
-        self.clock_refresh_rate = 1  # seconds
-
-        self.clk = Clock.schedule_interval(self.update_time, int(self.clock_refresh_rate))
-
-    def on_touch_up(self, touch):
-        pass
-
-    def _get_current_date(self):
-        """
-            Return the current data with the desired configuration
-        """
-        if '24h' in self.clock_format:
-            # date_str = '[color=FFFFFF][b][size={}]%H:%M:%S[/size]\n[size={}]%a, %d %B[/size][/color][/b]'.format(
-            #     int(self.icon_size[0]), int(self.icon_size[1]))
-            date_str = '[color=FFFFFF][b][size={}]%H:%M[/size]\n[size={}]%a, %d %B[/size][/color][/b]'.format(
-                int(self.icon_size[0]), int(self.icon_size[1]))
-        else:
-            # date_str = '[color=FFFFFF][b][size={}]%I:%M:%S[/size][size={}] %p[/size]\n[size=25]%a, %d %B[/size][/b][/color]'.format(
-            #     int(self.icon_size[0]), int(self.icon_size[1]))
-            date_str = '[color=FFFFFF][b][size={}]%I:%M[/size][size={}] %p[/size]\n[size=25]%a, %d %B[/size][/b][/color]'.format(
-                int(self.icon_size[0]), int(self.icon_size[1]))
-        return time.strftime(date_str)
-
-    def update_time(self, dt):
-        """
-            This function does the update of the time on screen
-        """
-        self.ctimer_text = self._get_current_date()
+DEBUG = True
 
 
 class InfoScreen(FloatLayout, BlackHole):
@@ -64,18 +26,18 @@ class InfoScreen(FloatLayout, BlackHole):
     locked = BooleanProperty(False)
     plugins = ListProperty()
     scrmgr = ObjectProperty(None)
+    overlay_mgr = ObjectProperty(None)
 
-    # List of plugings
+    # List of plugins
 
-    def __init__(self, plugins=None, **kwargs):
-        plugins = plugins
+    def __init__(self, plugins=None, overlays=None, **kwargs):
+        self._plugins = plugins
+        overlays = overlays
         super(InfoScreen, self).__init__(**kwargs)
 
-        # Get our list of available plugins
-        # plugins = kwargs["plugins"]
-
-        # We need a list to hold the names of the enabled screens
-        self.availablescreens = []
+        # We need a list to hold the names of the enabled screens and overlays
+        self.available_screens = []
+        self.available_overlays = []
 
         # and an index so we can loop through them:
         self.index = 0
@@ -86,13 +48,56 @@ class InfoScreen(FloatLayout, BlackHole):
 
         # Empty lists to track various failures
         dep_fail = []
-        failedscreens = []
+        failed_screens = []
 
-        # Create a reference to the screenmanager instance
-        # self.scrmgr = self.ids.iscreenmgr
+        # Loop over overlays
+        for w in overlays:
+            Logger.info("Loading Overlay: {}".format(w["name"]))
+            # Set up a tuple to store list of unmet dependencies
+            w_dep = (w["name"], [])
 
+            # Until we hit a failure, there are no unmet dependencies
+            unmet = False
+
+            # Loop over dependencies and test if they exist
+            for d in w["dependencies"]:
+                try:
+                    imp.find_module(d)
+                except ImportError:
+                    # We've got at least one unmet dependency for this screen
+                    unmet = True
+                    w_dep[1].append(d)
+                    Logger.error("Unmet dependencies "
+                                 "for {} Overlay. Skipping...".format(w["name"]))
+
+            # Can we use the screen?
+            if unmet:
+                # Add the tupe to our list of unmet dependencies
+                dep_fail.append(w_dep)
+
+            # No unmet dependencies so let's try to load the screen.
+            else:
+                try:
+                    plugin = imp.load_module("overlay", *w["info"])
+                    overlay = getattr(plugin, w["overlay"])
+                    self.overlay_mgr.add_widget(overlay(name=w["name"],
+                                                        master=self,
+                                                        params=w["params"]))
+                    Logger.info("Overlay: {} loaded.".format(w["name"]))
+
+                # Uh oh, something went wrong...
+                except Exception as e:
+                    # Add the screen name and error message to our list
+                    Logger.error("Could not import "
+                                 "{} Overlay. Skipping...".format(w["name"]))
+                    failed_screens.append((w["name"], repr(e)))
+
+                else:
+                    # We can add the screen to our list of available screens.
+                    self.available_overlays.append(w["name"])
+        print("Overlay children", self.overlay_mgr.children)
         # Loop over plugins
-        for p in plugins:
+        for p in self._plugins:
 
             # Set up a tuple to store list of unmet dependencies
             p_dep = (p["name"], [])
@@ -118,37 +123,51 @@ class InfoScreen(FloatLayout, BlackHole):
 
             # No unmet dependencies so let's try to load the screen.
             else:
-                try:
+                # This way we put the debug info to console instead of catching errors
+                if DEBUG:
                     plugin = imp.load_module("screen", *p["info"])
                     screen = getattr(plugin, p["screen"])
                     self.scrmgr.add_widget(screen(name=p["name"],
-                                           master=self,
-                                           params=p["params"]))
+                                                  master=self,
+                                                  params=p["params"]))
                     Logger.info("Screen: {} loaded.".format(p["name"]))
-
-                # Uh oh, something went wrong...
-                except Exception as e:
-                    # Add the screen name and error message to our list
-                    Logger.error("Could not import "
-                                 "{} screen. Skipping...".format(p["name"]))
-                    failedscreens.append((p["name"], repr(e)))
-
-                else:
                     # We can add the screen to our list of available screens.
-                    self.availablescreens.append(p["name"])
+                    self.available_screens.append(p["name"])
+                else:
+                    try:
+                        plugin = imp.load_module("screen", *p["info"])
+                        screen = getattr(plugin, p["screen"])
+                        self.scrmgr.add_widget(screen(name=p["name"],
+                                               master=self,
+                                               params=p["params"]))
+                        Logger.info("Screen: {} loaded.".format(p["name"]))
+
+                    # Uh oh, something went wrong...
+                    except Exception as e:
+                        # Add the screen name and error message to our list
+                        Logger.error("Could not import "
+                                     "{} screen. Skipping...".format(p["name"]))
+                        failed_screens.append((p["name"], repr(e)))
+
+                    else:
+                        # We can add the screen to our list of available screens.
+                        self.available_screens.append(p["name"])
 
         # If we've got any failures then let's notify the user.
-        if dep_fail or failedscreens:
+        if dep_fail or failed_screens:
 
             # Create the FailedScreen instance
             self.failscreen = FailedScreen(dep=dep_fail,
-                                           failed=failedscreens,
+                                           failed=failed_screens,
                                            name="FAILEDSCREENS")
 
             # Add it to our screen manager and make sure it's the first screen
             # the user sees.
             self.scrmgr.add_widget(self.failscreen)
             self.scrmgr.current = "FAILEDSCREENS"
+
+        # Update the overlay opacity to hide/show overlay depending on screen config
+        self.overlay_opacity(self.scrmgr.current)
 
     def toggle_lock(self, locked=None):
         if locked is None:
@@ -163,13 +182,20 @@ class InfoScreen(FloatLayout, BlackHole):
         # ...and add it again.
         self.add_screen(screen)
 
-    def add_screen(self, screenname):
+    def reload_overlay(self, overlay):
+        # Remove the old overlay
+        self.remove_overlay(overlay)
+
+        # and add it again.
+        self.add_overlay(overlay)
+
+    def add_screen(self, screen_name):
 
         # Get the info we need to import this screen
-        foundscreen = [p for p in getPlugins() if p["name"] == screenname]
+        foundscreen = [p for p in getPlugins() if p["name"] == screen_name]
 
         # Check we've found a screen and it's not already running
-        if foundscreen and screenname not in self.availablescreens:
+        if foundscreen and screen_name not in self.available_screens:
 
             # Get the details for the screen
             p = foundscreen[0]
@@ -189,32 +215,32 @@ class InfoScreen(FloatLayout, BlackHole):
                                    params=p["params"]))
 
             # Add to our list of available screens
-            self.availablescreens.append(screenname)
+            self.available_screens.append(screen_name)
 
             # Activate screen
-            self.switch_to(screename)
+            self.switch_to(screen_name)
 
-        elif screenname in self.availablescreens:
+        elif screen_name in self.available_screens:
 
             # This shouldn't happen but we need this to prevent duplicates
-            self.reload_screen(screenname)
+            self.reload_screen(screen_name)
 
-    def remove_screen(self, screenname):
+    def remove_screen(self, screen_name):
 
         # Get the list of screens
-        foundscreen = [p for p in getPlugins(inactive=True) if p["name"] == screenname]
+        foundscreen = [p for p in getPlugins(inactive=True) if p["name"] == screen_name]
 
         # Loop over list of available screens
-        while screenname in self.availablescreens:
+        while screen_name in self.available_screens:
 
             # Remove screen from list of available screens
-            self.availablescreens.remove(screenname)
+            self.available_screens.remove(screen_name)
 
             # Change the display to the next screen
             self.next_screen()
 
             # Find the screen in the screen manager
-            c = self.scrmgr.get_screen(screenname)
+            c = self.scrmgr.get_screen(screen_name)
 
             # Call its "unload" method:
             if hasattr(c, "unload"):
@@ -230,6 +256,39 @@ class InfoScreen(FloatLayout, BlackHole):
         except IndexError:
             pass
 
+    def remove_overlay(self, overlay):
+        # Get the list of screens
+        found_overlay = [p for p in get_overlays(inactive=True) if p["name"] == overlay]
+        # TODO - Complete
+
+
+        # Loop over list of available overlays
+        # while overlay in self.available_overlays:
+
+            # Remove overlay from list of available overlays
+            # self.available_overlays.remove(overlay)
+
+            # # Find the overlay in the overlay manager
+            # c = self.overlay_mgr.get_screen(overlay)
+            #
+            # # Call its "unload" method:
+            # if hasattr(c, "unload"):
+            #     c.unload()
+            #
+            # # Delete the screen
+            # self.overlay_mgr.remove_widget(c)
+            # del c
+
+        try:
+            # Remove the KV file from our builder
+            Builder.unload_file(found_overlay[0]["kvpath"])
+        except IndexError:
+            pass
+
+    def add_overlay(self, overlay):
+        # TODO - Complete
+        pass
+
     def next_screen(self, rev=False):
         if not self.locked:
             if rev:
@@ -239,15 +298,39 @@ class InfoScreen(FloatLayout, BlackHole):
                 self.scrmgr.transition.direction = "left"
                 inc = 1
 
-            self.index = (self.index + inc) % len(self.availablescreens)
-            self.scrmgr.current = self.availablescreens[self.index]
+            self.index = (self.index + inc) % len(self.available_screens)
+            self.scrmgr.current = self.available_screens[self.index]
+
+            # Update the overlay opacity to hide/show overlay depending on screen config
+            self.overlay_opacity(self.scrmgr.current)
 
     def switch_to(self, screen):
 
-        if screen in self.availablescreens:
+        if screen in self.available_screens:
 
             # Activate the screen
             self.scrmgr.current = screen
 
             # Update the screen index
-            self.index = self.availablescreens.index(screen)
+            self.index = self.available_screens.index(screen)
+
+            # Update the overlay opacity to hide/show overlay depending on screen config
+            self.overlay_opacity(self.scrmgr.current)
+
+    def overlay_opacity(self, screen_name):
+        # Find Screen in screen manager
+        c = self.scrmgr.get_screen(screen_name)
+        for plugin in self._plugins:
+            if plugin['name'] == screen_name:
+                if plugin['show_overlay']:
+                    self.overlay_mgr.opacity = 1
+                else:
+                    self.overlay_mgr.opacity = 0
+
+    def toggle_overlay(self):
+        if self.overlay_mgr.opacity == 1:
+            self.overlay_mgr.opacity = 0
+        elif self.overlay_mgr.opacity == 0:
+            self.overlay_mgr.opacity = 1
+        else:
+            pass

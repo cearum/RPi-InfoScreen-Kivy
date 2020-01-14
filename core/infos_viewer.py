@@ -113,47 +113,5 @@ class WeatherViewer(RelativeLayout):
         self.weather_text = self._get_current_weather()
 
 
-class ClockViewer(RelativeLayout):
-    """
-        This class handles the time information that is shown 
-        to the user
-    """
-    ctimer_text = StringProperty()
-
-    def __init__(self, **kwargs):
-        super(ClockViewer, self).__init__(**kwargs)
-        # Allow it to get always into the front on being touched
-        self.clock_format = "12h"
-        self.icon_size = [size_val*100/100 for size_val in Window.size]
-        self.ctimer_text = self._get_current_date()
-        self.clock_refresh_rate = 1  # seconds
-
-        self.clk = Clock.schedule_interval(self.update_time, int(self.clock_refresh_rate))
-
-    def on_touch_up(self, touch):
-        pass
-
-    def _get_current_date(self):
-        """
-            Return the current data with the desired configuration
-        """
-        if '24h' in self.clock_format:
-            # date_str = '[color=FFFFFF][b][size={}]%H:%M:%S[/size]\n[size={}]%a, %d %B[/size][/color][/b]'.format(
-            #     int(self.icon_size[0]), int(self.icon_size[1]))
-            date_str = '[color=FFFFFF][b][size={}]%H:%M[/size]\n[size={}]%a, %d %B[/size][/color][/b]'.format(
-                int(self.icon_size[0]), int(self.icon_size[1]))
-        else:
-            # date_str = '[color=FFFFFF][b][size={}]%I:%M:%S[/size][size={}] %p[/size]\n[size=25]%a, %d %B[/size][/b][/color]'.format(
-            #     int(self.icon_size[0]), int(self.icon_size[1]))
-            date_str = '[color=FFFFFF][b][size={}]%I:%M[/size][size={}] %p[/size]\n[size=25]%a, %d %B[/size][/b][/color]'.format(
-                int(self.icon_size[0]), int(self.icon_size[1]))
-        return time.strftime(date_str)
-
-    def update_time(self, dt):
-        """
-            This function does the update of the time on screen
-        """
-        self.ctimer_text = self._get_current_date()
-
 
 

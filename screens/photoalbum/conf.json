@@ -2,15 +2,12 @@
     "screen": "PhotoAlbumScreen",
     "kv": "photos.kv",
     "dependencies": [],
-    "enabled": false,
-    "params":
-    {
-        "duration": 5,
-        "extensions": ["jpg", "png"],
-        "folders":
-        [
-            "/home/pi/Pictures",
-            "/home/pi/Desktop"
+    "enabled": true,
+    "params": {
+        "duration": 10,
+        "random": true,
+        "folders": [
+            "/home/pi/images"
         ]
     }
 }

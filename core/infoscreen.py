@@ -9,17 +9,21 @@ from kivy.metrics import dp
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.behaviors import ButtonBehavior
+from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.core.window import Window
 from kivy.clock import Clock
 
 from kivymd.toast.kivytoast.kivytoast import toast
-from kivymd.uix.bottomsheet import MDGridBottomSheet, MDCustomBottomSheet, MDBottomSheet
 from kivymd.uix.snackbar import Snackbar
+from kivymd.uix.slider import MDSlider
 
 from core.failedscreen import FailedScreen
 from core.getplugins import getPlugins
 from core.getoverlays import get_overlays
+from core.bottomsheet import MDBottomSheet
+
+from functools import partial
 
 
 class BlackHole(object):
@@ -354,33 +358,29 @@ class InfoScreen(FloatLayout, BlackHole):
 # TODO Move Settings Screen Popup to it's own file
 
     def callback_for_setting_items(self, *args):
+        print(args)
         toast(args[0])
 
     def toggle_settings(self):
 
         bs_menu = MyMDGridBottomSheet()
+
         bs_menu.add_item(
-            "Blank",
-            lambda x: self.callback_for_setting_items("Blank"),
-            icon_src="images/10x10_transparent.png",
-        )
-        bs_menu.add_item(
-            "Blank",
-            lambda x: self.callback_for_setting_items("Blank"),
-            icon_src="images/10x10_transparent.png",
-        )
-        bs_menu.add_item(
-            "Facebook",
             lambda x: self.callback_for_setting_items("Brightness"),
             icon_src="images/brightness-5-black.png",
         )
+        bs_menu.add_slider(
+            partial(self.callback_for_setting_items, "slider"),
+        )
         bs_menu.add_item(
-            "Blank",
+            lambda x: self.callback_for_setting_items("Dashboard"),
+            icon_src="images/view-dashboard-variant-black.png",
+        )
+        bs_menu.add_item(
             lambda x: self.callback_for_setting_items("Blank"),
             icon_src="images/10x10_transparent.png",
         )
         bs_menu.add_item(
-            "Blank",
             lambda x: self.callback_for_setting_items("Blank"),
             icon_src="images/10x10_transparent.png",
         )
@@ -392,13 +392,13 @@ class InfoScreen(FloatLayout, BlackHole):
 Builder.load_string(
     """
 <MyBottomIcon>
-    
+    id: icon
+    size_hint: 0.1, 1
+    source: root.source
     
 <MyGridBottomSheetItem>
     orientation: "vertical"
     padding: 0, 0, 0, 0
-    size_hint_y: 50
-    size_hint_x: 50
     width: 50
     height: 50
     #size: dp(64), dp(96)
@@ -406,6 +406,8 @@ Builder.load_string(
     MyBottomIcon:
         id: icon
         size_hint_y: 48
+        size_hint_x: 48
+        width: 48
         on_release: root.release_btn()
         source: root.source
 
@@ -415,7 +417,8 @@ Builder.load_string(
 
 
 class MyBottomIcon(ButtonBehavior, Image):
-    pass
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 
 class MyGridBottomSheetItem(BoxLayout):
@@ -438,15 +441,40 @@ class MyGridBottomSheetItem(BoxLayout):
         #print(self.ids.icon)
         #self.ids.icon.bind(on_release=lambda x: self.on_release)
 
+
+class MyMDSlider(MDSlider):
+    def __init__(self, callback, **kwargs):
+        super(MyMDSlider, self).__init__(**kwargs)
+        self.callback = callback
+        self.size_hint_x = 0.2
+
+    def on_touch_move(self, touch):
+        super().on_touch_move(touch)
+        self.callback(self.value)
+        # callback = partial(self.callback)
+        # callback(self.value)
+
+
 class MyMDGridBottomSheet(MDBottomSheet):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._gl_content.padding = (dp(30), 0, dp(30), 0)  # (dp(0), 0, dp(0), dp(0))
+        # self._gl_content.padding = (0, 0, 0, 0)  # (dp(0), 0, dp(0), dp(0))
         self._gl_content.height = 50  # dp(50)
-        self._gl_content.cols = 6
+        # self._gl_content.cols = 100  # make absurdly large so that I never hit it
+        # self._gl_content.col_default_width = 60
+        # self._gl_content.col_force_default = True
 
-    def add_item(self, text, callback, icon_src):
-        MyGridBottomSheetItem()
+    def add_item(self, callback, icon_src):
 
-        item = MyGridBottomSheetItem(on_release=callback, source=icon_src)
+        item = MyBottomIcon(on_release=callback, source=icon_src)
+        # item = Image(source=icon_src, )
         self._gl_content.add_widget(item)
+
+
+    def add_slider(self, callback):
+
+        item = MyMDSlider(callback=callback)
+        self._gl_content.add_widget(item)
+        #
+        # btn = Button(text="text", width=40, size_hint=(None, 0.15))
+        # self._gl_content.add_widget(btn)

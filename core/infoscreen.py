@@ -47,7 +47,7 @@ class InfoScreen(FloatLayout, BlackHole):
 
     def __init__(self, plugins=None, overlays=None, config=None, **kwargs):
         self._plugins = plugins
-        overlays = overlays
+        self._overlays = overlays
         self._config = config
         super(InfoScreen, self).__init__(**kwargs)
 
@@ -71,7 +71,7 @@ class InfoScreen(FloatLayout, BlackHole):
         settings_enabled = settings_config.get("enabled", False)
 
         # Loop over overlays
-        for w in overlays:
+        for w in self._overlays:
             Logger.info("Loading Overlay: {}".format(w["name"]))
             # Set up a tuple to store list of unmet dependencies
             w_dep = (w["name"], [])
@@ -100,6 +100,7 @@ class InfoScreen(FloatLayout, BlackHole):
                 try:
                     plugin = imp.load_module("overlay", *w["info"])
                     overlay = getattr(plugin, w["overlay"])
+
                     self.overlay_mgr.add_widget(overlay(name=w["name"],
                                                         master=self,
                                                         params=w["params"]))
@@ -115,7 +116,7 @@ class InfoScreen(FloatLayout, BlackHole):
                 else:
                     # We can add the screen to our list of available screens.
                     self.available_overlays.append(w["name"])
-        print("Overlay children", self.overlay_mgr.children)
+
         # Loop over plugins
         for p in self._plugins:
 
@@ -276,38 +277,142 @@ class InfoScreen(FloatLayout, BlackHole):
         except IndexError:
             pass
 
-    def remove_overlay(self, overlay):
-        # Get the list of screens
-        found_overlay = [p for p in get_overlays(inactive=True) if p["name"] == overlay]
-        # TODO - Complete
+    # def remove_overlay(self, overlay_name):
+    #     # Get the list of screens
+    #     found_overlay = [p for p in get_overlays(inactive=True) if p["name"] == overlay_name]
+    #
+    #     print("Found Overlays:", found_overlay)
+    #     print("Available overlays", self.available_overlays)
+    #     # Loop over list of available overlays
+    #     while overlay_name in self.available_overlays:
+    #
+    #         for child in self.overlay_mgr.children:
+    #             print('Child: ', child.name)
+    #
+    #         # Find the overlay in the overlay manager
+    #         c = self.overlay_mgr.get_screen(overlay_name)
+    #
+    #         # Call its "unload" method:
+    #         if hasattr(c, "unload"):
+    #             c.unload()
+    #
+    #         # Delete the screen
+    #         self.overlay_mgr.remove_widget(c)
+    #         del c
+    #
+    #         # Remove overlay from list of available overlays
+    #         self.available_overlays.remove(overlay_name)
+    #
+    #     try:
+    #         # Remove the KV file from our builder
+    #         Builder.unload_file(found_overlay[0]["kvpath"])
+    #     except IndexError:
+    #         pass
+    #
+    # def add_overlay(self, overlay_name):
+    #     # Get the info we need to import this screen
+    #     found_overlay = [p for p in get_overlays() if p["name"] == overlay_name]
+    #
+    #     # Check we've found a screen and it's not already running
+    #     if found_overlay and overlay_name not in self.available_overlays:
+    #         # Get the details for the screen
+    #         w = found_overlay[0]
+    #
+    #         try:
+    #             # Import it
+    #             plugin = imp.load_module("overlay", *w["info"])
+    #
+    #             # Get the reference to the screen class
+    #             overlay = getattr(plugin, w["overlay"])
+    #
+    #             # Add the KV file to the builder
+    #             # Builder.load_file(w["kvpath"])
+    #
+    #             # Add the overlay
+    #             self.overlay_mgr.add_widget(overlay(name=w["name"],
+    #                                                 master=self,
+    #                                                 params=w["params"]))
+    #             Logger.info("Overlay: {} loaded.".format(w["name"]))
+    #
+    #         # Uh oh, something went wrong...
+    #         except Exception as e:
+    #             # Add the screen name and error message to our list
+    #             Logger.error("Could not import "
+    #                          "{} Overlay. Skipping...".format(w["name"]))
+    #
+    #             raise e
+    #
+    #         else:
+    #             # We can add the screen to our list of available overlays.
+    #             self.available_overlays.append(w["name"])
+    #
+    #     elif overlay_name in self.available_overlays:
+    #
+    #         # This shouldn't happen but we need this to prevent duplicates
+    #         self.reload_overlay(overlay_name)
 
+    def load_all_overlays(self, reload=False):
 
-        # Loop over list of available overlays
-        # while overlay in self.available_overlays:
+        # if we are reloading then we want to remove all kv files from builder before we add them all again
+        if reload:
+            self.overlay_mgr.clear_widgets()
+            for w in self._overlays:
+                Builder.unload_file(w['kvpath'])
 
-            # Remove overlay from list of available overlays
-            # self.available_overlays.remove(overlay)
+        self._overlays = get_overlays()
 
-            # # Find the overlay in the overlay manager
-            # c = self.overlay_mgr.get_screen(overlay)
-            #
-            # # Call its "unload" method:
-            # if hasattr(c, "unload"):
-            #     c.unload()
-            #
-            # # Delete the screen
-            # self.overlay_mgr.remove_widget(c)
-            # del c
+        dep_fail = []
+        failed_screens = []
 
-        try:
-            # Remove the KV file from our builder
-            Builder.unload_file(found_overlay[0]["kvpath"])
-        except IndexError:
-            pass
+        for w in self._overlays:
+            Builder.load_file(w['kvpath'])
 
-    def add_overlay(self, overlay):
-        # TODO - Complete
-        pass
+        # Loop over overlays
+        for w in self._overlays:
+            Logger.info("Loading Overlay: {}".format(w["name"]))
+            # Set up a tuple to store list of unmet dependencies
+            w_dep = (w["name"], [])
+
+            # Until we hit a failure, there are no unmet dependencies
+            unmet = False
+
+            # Loop over dependencies and test if they exist
+            for d in w["dependencies"]:
+                try:
+                    imp.find_module(d)
+                except ImportError:
+                    # We've got at least one unmet dependency for this screen
+                    unmet = True
+                    w_dep[1].append(d)
+                    Logger.error("Unmet dependencies "
+                                 "for {} Overlay. Skipping...".format(w["name"]))
+
+            # Can we use the screen?
+            if unmet:
+                # Add the tupe to our list of unmet dependencies
+                dep_fail.append(w_dep)
+
+            # No unmet dependencies so let's try to load the screen.
+            else:
+                try:
+                    plugin = imp.load_module("overlay", *w["info"])
+                    overlay = getattr(plugin, w["overlay"])
+
+                    self.overlay_mgr.add_widget(overlay(name=w["name"],
+                                                        master=self,
+                                                        params=w["params"]))
+                    Logger.info("Overlay: {} loaded.".format(w["name"]))
+
+                # Uh oh, something went wrong...
+                except Exception as e:
+                    # Add the screen name and error message to our list
+                    Logger.error("Could not import "
+                                 "{} Overlay. Skipping...".format(w["name"]))
+                    failed_screens.append((w["name"], repr(e)))
+
+                else:
+                    # We can add the screen to our list of available screens.
+                    self.available_overlays.append(w["name"])
 
     def next_screen(self, rev=False):
         if not self.locked:

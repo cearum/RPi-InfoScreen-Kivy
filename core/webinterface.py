@@ -37,8 +37,8 @@ SCREEN_CONFIG = '''% rebase("base.tpl", title="Configuration Screen: {}".format(
     <br />
     <button type="submit">Save Config</button></form>'''
 
-OVERLAY_CONFIG = '''% rebase("base.tpl", title="Configuration Screen: {}".format(overlay.capitalize()))
-    <form action="/configure/overlay/{{overlay}}" method="POST">
+OVERLAY_CONFIG = '''% rebase("base.tpl", title="Configuration Screen: {}".format(overlay_name.capitalize()))
+    <form action="/configure/overlay_name/{{overlay_name}}" method="POST">
     <br />
     <textarea cols="60" rows="10" name="params" maxlength="2500">{{conf}}</textarea><br />
     <br />
@@ -78,8 +78,8 @@ class InfoScreenWebServer(Bottle):
         # Define our routes
         self.route("/configure/screen/<screen>", callback=self.update_screen_config, method="GET")
         self.route("/configure/screen/<screen>", callback=self.save_screen_config, method="POST")
-        self.route("/configure/overlay/<overlay>", callback=self.update_overlay_config, method="GET")
-        self.route("/configure/overlay/<overlay>", callback=self.save_overlay_config, method="POST")
+        self.route("/configure/overlay_name/<overlay_name>", callback=self.update_overlay_config, method="GET")
+        self.route("/configure/overlay_name/<overlay_name>", callback=self.save_overlay_config, method="POST")
         self.route("/view/<screen>", callback=self.view)
         self.route("/", callback=self.list_screens, method=["GET", "POST"])
 
@@ -104,7 +104,7 @@ class InfoScreenWebServer(Bottle):
         # Get a list of just those screens who have custom web pages
         addons = [(x, sc[x]["web"]) for x in sc if sc[x]["web"]]
 
-        # Get the custom overlay dictionary
+        # Get the custom overlay_name dictionary
         ol = self.overlays
         overlays = [(x, ol[x]["web"]) for x in ol if ol[x]["web"]]
 
@@ -146,7 +146,7 @@ class InfoScreenWebServer(Bottle):
     def valid_screen(self, screen):
         """Returns True if screen is installed and enabled."""
         return (screen is not None and
-                screen in self.infoscreen.availablescreens)
+                screen in self.infoscreen.available_screens)
 
     def list_screens(self):
         """Provides a list of all installed screens with various options."""
@@ -167,13 +167,13 @@ class InfoScreenWebServer(Bottle):
             if overlay is None:
                 # Call the relevant action
                 if action == "view":
-                    r = requests.get("{}screens/view/{}".format(self.api, screen))
+                    r = requests.get("{}screens/{}/view".format(self.api, screen))
 
                 elif action == "enable":
-                    r = requests.get("{}screens/enable/{}".format(self.api, screen))
+                    r = requests.get("{}screens/{}/enable".format(self.api, screen))
 
                 elif action == "disable":
-                    r = requests.get("{}screens/disable/{}".format(self.api, screen))
+                    r = requests.get("{}screens/{}/disable".format(self.api, screen))
 
                 elif action == "configure":
                     redirect("/configure/screen/{}".format(screen))
@@ -184,16 +184,16 @@ class InfoScreenWebServer(Bottle):
             else:
                 # Call the relevant action
                 if action == "view":
-                    r = requests.get("{}overlays/view/{}".format(self.api, screen))
+                    r = requests.get("{}overlays/{}/view".format(self.api, screen))
 
                 elif action == "enable":
-                    r = requests.get("{}overlays/enable/{}".format(self.api, screen))
+                    r = requests.get("{}overlays/{}/enable".format(self.api, screen))
 
                 elif action == "disable":
-                    r = requests.get("{}overlays/disable/{}".format(self.api, screen))
+                    r = requests.get("{}overlays/{}/disable".format(self.api, screen))
 
                 elif action == "configure":
-                    redirect("/configure/overlay/{}".format(screen))
+                    redirect("/configure/overlay_name/{}".format(screen))
 
                 elif action == "custom":
                     url = self.custom_screens.get(screen, "/")
@@ -210,7 +210,7 @@ class InfoScreenWebServer(Bottle):
 
     def view(self, screen=None):
         """Method to switch screen."""
-        r = requests.get("{}/screens/view/{}".format(self.api, screen))
+        r = requests.get("{}/screens/{}view".format(self.api, screen))
 
         return template("all_screens.tpl", screens=self.screens)
 
@@ -260,7 +260,7 @@ class InfoScreenWebServer(Bottle):
 
             if change_params:
                 # Submit the new params to the API
-                r = requests.post("{}screens/configure/{}".format(self.api, screen), json=params)
+                r = requests.post("{}screens/{}/configurations".format(self.api, screen), json=params)
 
             redirect("/")
 
@@ -310,9 +310,10 @@ class InfoScreenWebServer(Bottle):
 
             if change_params:
                 # Submit the new params to the API
-                r = requests.post("{}overlays/configure/{}".format(self.api, overlay), json=params)
+                r = requests.post("{}overlays/{}/configurations".format(self.api, overlay), json=params)
 
             redirect("/")
+
 
 def start_web(appdir, webport, apiport, debug=False):
     """Starts the webserver on "webport"."""
@@ -328,6 +329,7 @@ def start_web(appdir, webport, apiport, debug=False):
 
     ws.run(host="0.0.0.0", port=webport, debug=debug)
 
+
 def start_api(appdir, apiport, debug=False):
     """Starts the API server on "apiport"."""
     infoapp = None
@@ -341,6 +343,7 @@ def start_api(appdir, apiport, debug=False):
     ws = InfoScreenAPI(infoapp, appdir)
 
     ws.run(host="0.0.0.0", port=apiport, debug=debug)
+
 
 def start_web_server(appdir, webport=8088, apiport=8089, debug=False):
     # Create the webserver in a new thread

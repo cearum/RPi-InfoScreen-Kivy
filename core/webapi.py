@@ -1,6 +1,6 @@
 '''Web interface for the Raspberry Pi Information Screen.
 
-   by elParaguayo
+   original by elParaguayo and modified by cearum
 
    This module defines the underlying API.
 
@@ -8,22 +8,30 @@
    methods available in this API.
 
    API format:
+    [HOST]/api/screens
+        GET: returns JSON format of all available screens
 
-   [HOST]/api/<screen_name>/configure
+    [HOST]/api/screens/current
+        GET: currently displayed screen
+
+    [HOST]/api/screens/<screen_name>/configurations
         GET: returns JSON format of user-configurable settings for screen
         POST: takes JSON format of updated configuration.
 
-   [HOST]/api/<screen_name>/enable
+    [HOST]/api/screens/<screen_name>/enable
         GET: enable the selected screen
 
-   [HOST]/api/<screen_name>/disable
+    [HOST]/api/screens/<screen_name>/disable
         GET: disable the selected screen
 
-   [HOST]/api/<screen_name>/view
+    [HOST]/api/screens/<screen_name>/restart
+        GET: restart the selected screen
+
+    [HOST]/api/screens/<screen_name>/view
         GET: change to screen
 
 
-   API Response format:
+    API Response format:
      successful:
        {"status": "success",
         "data": [body of response]}
@@ -31,6 +39,26 @@
      unsuccessful:
        {"status": "error",
         "message": [Error message]}
+
+    /api/display/notification
+    /api/display/video
+    /api/display/image
+
+    /api/overlays
+    /api/overlays/view
+
+    /api/overlays/<overlay_name>/enable
+    /api/overlays/<overlay_name>/disable
+    /api/overlays/<overlay_name>/restart
+    /api/overlays/<overlay_name>/configurations
+    configurations
+
+    /api/configurations
+    /api/configurations/units/{si, uk, us}
+    /api/configurations/display/brightness{/int 0:100}
+    /api/configurations/notifications
+    /api/configurations/notifications/state{/on or /off}
+    /api/configurations/notifications/duration{/(int 0 to 600)}
 '''
 
 from threading import Thread
@@ -44,6 +72,7 @@ from kivy.app import App
 from bottle import Bottle, template, request, response
 
 from core.getplugins import getPlugins
+
 
 class InfoScreenAPI(Bottle):
     def __init__(self, infoscreen, folder):
@@ -64,22 +93,29 @@ class InfoScreenAPI(Bottle):
         self.error_handler[404] = self.unknown
 
         # API METHODS
-        self.route("/api/screens/configure/<screen>",
+        self.route("/api/screens",
+                   callback=self.get_screens,
+                   method="GET")
+        self.route("/api/screens/<screen>/configurations",
                    callback=self.get_config,
                    method="GET")
-        self.route("/api/screens/configure/<screen>",
+        self.route("/api/screens/<screen>/configurations",
                    callback=self.set_config,
                    method="POST")
-        self.route("/api/screens/enable/<screen>",
+        self.route("/api/screens/<screen>/enable",
                    callback=self.enable_screen)
-        self.route("/api/screens/disable/<screen>",
+        self.route("/api/screens/<screen>/disable",
                    callback=self.disable_screen)
-        self.route("/api/screens/view/<screen>",
+        self.route("/api/screens/<screen>/view",
                    callback=self.view)
 
-        self.route("/api/overlays/configure/<overlay>",
+        self.route("/api/overlays/<overlay_name>/configurations",
                    callback=self.set_overlay_config,
                    method="POST")
+        self.route("/api/overlays/<overlay_name>/enable",
+                   callback=self.enable_overlay)
+        self.route("/api/overlays/<overlay_name>/disable",
+                   callback=self.disable_overlay)
 
     def api_success(self, data):
         """Base method for response to successful API calls."""
@@ -92,6 +128,10 @@ class InfoScreenAPI(Bottle):
 
         return {"status": "error",
                   "message": message}
+
+    def get_screens(self):
+        result = self.api_success(self.infoscreen.available_screens)
+        return result
 
     def get_config(self, screen):
         """Method to retrieve config file for screen."""
@@ -150,7 +190,7 @@ class InfoScreenAPI(Bottle):
             # Something's gone wrong
             return self.api_error("Invalid data received.")
 
-    def set_overlay_config(self, overlay):
+    def set_overlay_config(self, overlay_name):
 
         try:
             # Get JSON data
@@ -163,13 +203,13 @@ class InfoScreenAPI(Bottle):
 
             else:
                 # Try to save the new config
-                success = self.save_config(overlay, js, "overlays")
+                success = self.save_config(overlay_name, js, "overlays")
 
                 # If successfully saved...
                 if success:
 
                     # Reload the screen with the new config
-                    self.infoscreen.reload_screen(overlay)
+                    self.infoscreen.reload_screen(overlay_name)
 
                     # Provide success notification
                     return self.api_success(json.dumps(js))
@@ -181,6 +221,42 @@ class InfoScreenAPI(Bottle):
         except:
             # Something's gone wrong
             return self.api_error("Invalid data received.")
+
+    def enable_overlay(self, overlay_name):
+        try:
+            # Update status in config
+            self.change_overlay_state(overlay_name, True)
+
+            # Reload all Overlays (so far the best way I've found as it's not possible to find specific
+            # overlay like you can with the screens)
+            self.infoscreen.load_all_overlays(reload=True)
+
+            # Success!
+            return self.api_success("{} overlay enabled.".format(overlay_name))
+
+        except:
+
+            # Something went wrong
+            return self.api_error("Could not enable {} overlay.".format(overlay_name))
+
+    def disable_overlay(self, overlay_name):
+
+        try:
+
+            # Update status in config
+            self.change_overlay_state(overlay_name, False)
+
+            # Reload all Overlays (so far the best way I've found as it's not possible to find specific
+            # overlay like you can with the screens)
+            self.infoscreen.load_all_overlays(reload=True)
+
+            # Success!
+            return self.api_success("{} overlay disabled.".format(overlay_name))
+
+        except:
+
+            # Something went wrong
+            return self.api_error("Could not disable {} overlay.".format(overlay_name))
 
     def default(self):
         # Generic response for unknown requests
@@ -267,4 +343,20 @@ class InfoScreenAPI(Bottle):
 
         # Save the updated config
         with open(conffile, "w") as f_config:
+            json.dump(conf, f_config, indent=4)
+
+    def change_overlay_state(self, overlay, enabled):
+
+        # Build path to config
+        conf_file = os.path.join(self.folder, "overlays", overlay, "conf.json")
+
+        # Load existing config
+        with open(conf_file, "r") as f_config:
+            conf = json.load(f_config)
+
+        # Change status to desired state
+        conf["enabled"] = enabled
+
+        # Save the updated config
+        with open(conf_file, "w") as f_config:
             json.dump(conf, f_config, indent=4)
